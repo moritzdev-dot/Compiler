@@ -14,7 +14,8 @@ enum Prio {
     Compare,
     Add,
     Mult,
-    Prefix,
+    Prefix, 
+    Call,
 }
 
 
@@ -43,7 +44,36 @@ impl Parser {
     }
 
     fn parse_prefix(&mut self) -> ExpRef{
-        panic!("NOT IMPLEMENTED");
+        match self.cur.token_type {
+            TokenType::Plus => {
+                self.shift();
+                return self.parse(Prio::Prefix);
+
+            }
+
+            TokenType::Minus => {
+                self.shift();
+                let operand = self.parse(Prio::Prefix);
+                self.new_expression(Box::new(
+                    Expression::PrefixExpression { op: TokenType::Minus, right: operand }
+                ))
+            }
+
+            _ => {
+                panic!("WHY?");
+            }
+
+        }
+    }
+    fn parse_block(&mut self) -> Vec<Box<Statement>> {
+        self.shift();
+        self.shift();
+        let mut body: Vec<Box<Statement>> = Vec::new();
+        while self.cur.token_type != TokenType::RBrace {
+            let stmt = self.parse_stmt();
+            body.push(Box::new(stmt));
+        }
+        return body;
     }
     
     fn parse_literal(&mut self) -> ExpRef {
@@ -67,17 +97,29 @@ impl Parser {
     }
     pub fn parse_stmt(&mut self) -> Statement {
         let stmt = match self.cur.token_type {
+            TokenType::If => {
+                self.shift();
+                let cond = self.parse(Prio::None);
+                self.shift();
+                let if_block = self.parse_block();
+                Statement::IfElseStatement { 
+                    condition: cond, 
+                    if_body: if_block, 
+                    else_body: None 
+                }
+            }
             _ => {
-                Statement::ExpressionStatement(self.parse(Prio::None))
+                let s = Statement::ExpressionStatement(self.parse(Prio::None));
+                self.shift();
+                self.shift();
+                s
             }
         };
-        self.shift();
-        self.shift();
+        println!("{}", self);
         return stmt;
 
     }
-    fn get_prioritie(t: &TokenType) -> Prio {
-
+    fn get_prio(t: &TokenType) -> Prio {
         match t {
             TokenType::Plus | TokenType::Minus => {
                 return Prio::Add
@@ -85,8 +127,12 @@ impl Parser {
             TokenType::Astrik | TokenType::Slash => {
                 return Prio::Mult
             }
+            TokenType::LParent => {
+                return Prio::Call
+            }
+
             _ => {
-                panic!("Prio for {:?} not implemented", t);
+                return Prio::None
             }
 
         }
@@ -94,7 +140,7 @@ impl Parser {
 
     fn parse_infix(&mut self, left: ExpRef) -> ExpRef {
         let op = self.cur.token_type.clone();
-        let p = Self::get_prioritie(&self.cur.token_type);
+        let p = Self::get_prio(&self.cur.token_type);
         self.shift();
         let right = self.parse(p);
         let exp = Expression::InfixExpression {
@@ -114,11 +160,17 @@ impl Parser {
             TokenType::Integer | TokenType::String => {
                 self.parse_literal()
             }
+            TokenType::LParent => {
+                self.shift();
+                let l = self.parse(Prio::None);
+                l
+            }
+            
             _ => {
                 panic!("NOT VALID TOKENTYPE: {}", self.cur);
             }
         };
-        while !(self.next.token_type == TokenType::Semicolon) && p < Self::get_prioritie(&self.next.token_type){
+        while !(self.next.token_type == TokenType::Semicolon) && p < Self::get_prio(&self.next.token_type){
             self.shift();
             left = self.parse_infix(left);
         }
@@ -147,6 +199,13 @@ impl Parser {
     }
     pub fn print_stmt(&self, stmt: Statement) {
         match stmt {
+            Statement::IfElseStatement { condition, if_body, else_body } => {
+                println!("if({}) {{ ", self.exp_to_string(condition));
+                for i in if_body {
+                    self.print_stmt(*i);
+                }
+                println!("}}");
+            }
             Statement::ExpressionStatement(exp) => {
                 println!("{}", self.exp_to_string(exp))
             }

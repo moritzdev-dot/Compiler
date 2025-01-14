@@ -18,6 +18,8 @@ impl Tokenizer {
         map.insert(String::from("return"), TokenType::Return);
         map.insert(String::from("var"), TokenType::Var);
         map.insert(String::from("const"), TokenType::Const);
+        map.insert(String::from("if"), TokenType::If);
+        map.insert(String::from("else"), TokenType::Else);
 
         return Tokenizer {
             input: s.clone(),
@@ -135,7 +137,7 @@ impl Tokenizer {
         }
         self.shift();
 
-        while self.cur_char == ' ' {
+        while self.cur_char == ' ' || self.cur_char == '\t' || self.cur_char == '\n' {
             self.shift();
         }
 

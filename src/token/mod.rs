@@ -22,6 +22,8 @@ pub enum TokenType {
     Integer,
     String,
     Identifier,
+    If,
+    Else,
     Func,
     Var,
     Const,
