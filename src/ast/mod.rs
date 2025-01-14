@@ -11,6 +11,11 @@ pub enum Statement {
         if_body: Vec<Box<Statement>>,
         else_body: Option<Vec<Box<Statement>>>
     },
+    FuncStatement {
+        name: String,
+        call_inputs: Vec<String>,
+        body: Vec<Box<Statement>>,
+    },
 
     ExpressionStatement(ExpRef)
 }

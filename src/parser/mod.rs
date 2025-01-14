@@ -100,22 +100,31 @@ impl Parser {
             TokenType::If => {
                 self.shift();
                 let cond = self.parse(Prio::None);
-                self.shift();
                 let if_block = self.parse_block();
+                if self.next.token_type != TokenType::Else {
+                    return Statement::IfElseStatement { 
+                        condition: cond, 
+                        if_body: if_block, 
+                        else_body: None 
+                    }
+                }
+                self.shift();
+                let else_block = self.parse_block();
                 Statement::IfElseStatement { 
                     condition: cond, 
                     if_body: if_block, 
-                    else_body: None 
+                    else_body: Some(else_block)
                 }
+                
             }
             _ => {
                 let s = Statement::ExpressionStatement(self.parse(Prio::None));
                 self.shift();
                 self.shift();
+                println!("{}", self);
                 s
             }
         };
-        println!("{}", self);
         return stmt;
 
     }
@@ -163,6 +172,11 @@ impl Parser {
             TokenType::LParent => {
                 self.shift();
                 let l = self.parse(Prio::None);
+                if self.next.token_type != TokenType::RParent {
+                    panic!("NO RIGHT PARENTH FOUND");
+                }
+                self.shift();
+
                 l
             }
             
@@ -202,6 +216,22 @@ impl Parser {
             Statement::IfElseStatement { condition, if_body, else_body } => {
                 println!("if({}) {{ ", self.exp_to_string(condition));
                 for i in if_body {
+                    self.print_stmt(*i);
+                }
+                println!("}}");
+                if else_body.is_none() {
+                    return;
+                }
+                println!("else {{");
+                for i in else_body.unwrap() {
+                    self.print_stmt(*i);
+                }
+                println!("}}");
+
+            }
+            Statement::FuncStatement { name, call_inputs, body } => {
+                println!("func {}({}) {{", name, call_inputs.join(", "));
+                for i in body {
                     self.print_stmt(*i);
                 }
                 println!("}}");
