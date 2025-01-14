@@ -36,9 +36,9 @@ impl Tokenizer {
     }
 
     fn shift(&mut self) {
-        if self.cur_idx >= self.input.len() -1 {
+        if self.cur_idx + 2 >= self.input.len() {
             self.cur_char = self.next_char;
-            self.cur_idx += 1;
+            self.next_char = '\0';
             return;
         }
 
@@ -47,7 +47,7 @@ impl Tokenizer {
         self.next_char = self
             .input
             .chars()
-            .nth(self.cur_idx)
+            .nth(self.cur_idx + 1)
             .unwrap();
     }
      
@@ -59,10 +59,12 @@ impl Tokenizer {
     }
     fn get_integer(&mut self) -> String{
         let mut s = String::new();
-        while Self::is_number(self.cur_char) {
+        while Self::is_number(self.next_char) {
             s += &String::from(self.cur_char);
             self.shift();
         }
+        s += &String::from(self.cur_char);
+
         return s;
     }
 
@@ -77,23 +79,18 @@ impl Tokenizer {
 
     fn get_identifier(&mut self) -> String{
         let mut s = String::new();
-        while Self::is_number(self.cur_char) || 
-            Self::is_letter(self.cur_char) || 
+        while Self::is_number(self.next_char) || 
+            Self::is_letter(self.next_char) || 
             self.cur_char == '_' {
             s += &String::from(self.cur_char);
             self.shift();
         }
+        s += &String::from(self.cur_char);
+
         return s;
     }
 
     pub fn next_token(&mut self) -> Token{
-        if self.cur_idx >= self.input.len() {
-            return Token{
-                token_type: TokenType::EOF,
-                value: String::from(self.cur_char),
-            }
-        }
-
         let mut t = Token{
             token_type: TokenType::EOF,
             value: String::from(self.cur_char),
@@ -111,8 +108,10 @@ impl Tokenizer {
             ']' => t.token_type = TokenType::RBrack,
             '=' => t.token_type = TokenType::Assign,
             ':' => t.token_type = TokenType::Colon,
+            ';' => t.token_type = TokenType::Semicolon,
             ',' => t.token_type = TokenType::Comma,
             '.' => t.token_type = TokenType::Dot,
+            '\0' => t.token_type = TokenType::EOF,
             _ => {
                 if Self::is_number(self.cur_char) {
                     t.value = self.get_integer();

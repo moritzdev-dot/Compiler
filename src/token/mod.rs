@@ -1,4 +1,4 @@
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum TokenType {
     Plus,
     Minus,
@@ -17,6 +17,7 @@ pub enum TokenType {
     Colon,
     Comma,
     Dot,
+    Semicolon,
 
     Integer,
     String,
@@ -29,6 +30,7 @@ pub enum TokenType {
 }
 
 
+#[derive(Clone)]
 pub struct Token {
     pub token_type: TokenType,
     pub value: String,
