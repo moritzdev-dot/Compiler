@@ -175,6 +175,15 @@ impl Parser {
                 }
 
             }
+            TokenType::Return => {
+                self.shift();
+                let s = Statement::ReturnStatement{
+                    value: self.parse(Prio::None)
+                };
+                self.shift();
+                self.shift();
+                s
+            }
             TokenType::Func => {
                 self.shift();
                 let name = self.cur.value.clone();
@@ -208,6 +217,22 @@ impl Parser {
             TokenType::LParent => {
                 return Prio::Call
             }
+            TokenType::Assign => {
+                return Prio::Assign
+            }
+            TokenType::And => {
+                return Prio::And
+            }
+            TokenType::Or => {
+                return Prio::Or
+            }
+            TokenType::LT | TokenType::GT | TokenType::LTEQ | TokenType::GTEQ => {
+                return Prio::Compare
+            }
+            TokenType::EQ => {
+                return Prio::Equal;
+            }
+
 
             _ => {
                 return Prio::None
@@ -345,6 +370,12 @@ impl Parser {
                 let v = value.unwrap();
                 val += &format!(" = {}\n", self.exp_to_string(v));
                 return val;
+            }
+            Statement::ReturnStatement { value } => {
+                if ident > 0 {
+                    return format!("\treturn {}\n", self.exp_to_string(value));
+                } 
+                return format!("return {}\n", self.exp_to_string(value));
             }
             Statement::ExpressionStatement(exp) => {
                 if ident > 0 {

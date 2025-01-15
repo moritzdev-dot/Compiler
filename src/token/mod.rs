@@ -20,6 +20,14 @@ pub enum TokenType {
     Comma,
     Dot,
     Semicolon,
+    And,
+    Or,
+
+    GT,
+    LT,
+    GTEQ,
+    LTEQ,
+    EQ,
 
     Integer,
     String,

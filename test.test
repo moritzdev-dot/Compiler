@@ -1,6 +1,2 @@
-var x: int = "HALLO";
-x + 3;
-func main() {
-    x;
-}
-
+x > 3;
+x = x >= 3 == 3;

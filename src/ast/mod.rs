@@ -24,6 +24,9 @@ pub enum Statement {
         value: Option<ExpRef>,
         var_type: String
     },
+    ReturnStatement {
+        value: ExpRef
+    },
 
     ExpressionStatement(ExpRef)
 }

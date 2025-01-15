@@ -108,12 +108,51 @@ impl Tokenizer {
             '}' => t.token_type = TokenType::RBrace,
             '[' => t.token_type = TokenType::LBrack,
             ']' => t.token_type = TokenType::RBrack,
-            '=' => t.token_type = TokenType::Assign,
             ':' => t.token_type = TokenType::Colon,
             ';' => t.token_type = TokenType::Semicolon,
             ',' => t.token_type = TokenType::Comma,
             '.' => t.token_type = TokenType::Dot,
             '\0' => t.token_type = TokenType::EOF,
+            '=' => {
+                t.token_type = TokenType::Assign;
+                if self.next_char == '=' {
+                    t.token_type = TokenType::EQ;
+                    t.value = String::from("==");
+                    self.shift();
+                }
+            }
+            '<' => {
+                t.token_type = TokenType::LT;
+                if self.next_char == '=' {
+                    t.token_type = TokenType::LTEQ;
+                    t.value = String::from("<=");
+                    self.shift();
+                }
+            }
+            '>' => {
+                t.token_type = TokenType::GT;
+                if self.next_char == '=' {
+                    t.token_type = TokenType::GTEQ;
+                    t.value = String::from(">=");
+                    self.shift();
+                }
+            }
+            '&' => {
+                if self.next_char != '&' {
+                    panic!("unknown char");
+                }
+                self.shift();
+                t.token_type = TokenType::And;
+                t.value = String::from("&&");
+            }
+            '|' => {
+                self.shift();
+                if self.cur_char != '|' {
+                    panic!("unknown char");
+                }
+                t.token_type = TokenType::Or;
+                t.value = String::from("&&");
+            }
             _ => {
                 if Self::is_number(self.cur_char) {
                     t.value = self.get_integer();
