@@ -95,6 +95,22 @@ impl Parser {
             }
         }
     }
+    pub fn parse_list(&mut self) -> Vec<ExpRef> {
+        if self.cur.token_type != TokenType::LParent {
+            panic!("No Left Parenteses Found");
+        }
+        self.shift();
+        let mut list: Vec<ExpRef> = Vec::new();
+        while self.cur.token_type != TokenType::RParent {
+            let exp = self.parse(Prio::None);
+            list.push(exp);
+            self.shift();
+            if self.cur.token_type == TokenType::Comma {
+                self.shift();
+            }
+        }
+        return list;
+    }
     pub fn parse_stmt(&mut self) -> Statement {
         let stmt = match self.cur.token_type {
             TokenType::If => {
@@ -117,11 +133,22 @@ impl Parser {
                 }
                 
             }
+            TokenType::Func => {
+                self.shift();
+                let name = self.cur.value.clone();
+                self.shift();
+                let list = self.parse_list();
+                let body = self.parse_block();
+                Statement::FuncStatement { 
+                    name: name.clone(),
+                    call_inputs: list,
+                    body 
+                }
+            }
             _ => {
                 let s = Statement::ExpressionStatement(self.parse(Prio::None));
                 self.shift();
                 self.shift();
-                println!("{}", self);
                 s
             }
         };
@@ -169,6 +196,12 @@ impl Parser {
             TokenType::Integer | TokenType::String => {
                 self.parse_literal()
             }
+            TokenType::Identifier => {
+                self.new_expression(Box::new(Expression::Identifier {
+                    value: self.cur.value.clone(),
+                    ident_type: String::new(), 
+                }))
+            }
             TokenType::LParent => {
                 self.shift();
                 let l = self.parse(Prio::None);
@@ -206,6 +239,9 @@ impl Parser {
             Expression::String(i) => {
                 return format!("{}", i);
             }
+            Expression::Identifier { value, ident_type } => {
+                return format!("{}", value);
+            }
             _ => {
                 return format!("");
             }
@@ -230,7 +266,12 @@ impl Parser {
 
             }
             Statement::FuncStatement { name, call_inputs, body } => {
-                println!("func {}({}) {{", name, call_inputs.join(", "));
+                let s = call_inputs
+                    .iter()
+                    .map(|x| self.exp_to_string(*x))
+                    .collect::<Vec<String>>()
+                    .join(", ");
+                println!("func {}({}) {{", name, s);
                 for i in body {
                     self.print_stmt(*i);
                 }

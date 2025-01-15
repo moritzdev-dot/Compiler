@@ -13,7 +13,7 @@ pub enum Statement {
     },
     FuncStatement {
         name: String,
-        call_inputs: Vec<String>,
+        call_inputs: Vec<ExpRef>,
         body: Vec<Box<Statement>>,
     },
 
