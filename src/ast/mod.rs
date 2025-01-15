@@ -19,6 +19,11 @@ pub enum Statement {
         call_inputs: Vec<ExpRef>,
         body: Vec<Box<Statement>>,
     },
+    VarStatement {
+        name: String,
+        value: Option<ExpRef>,
+        var_type: String
+    },
 
     ExpressionStatement(ExpRef)
 }

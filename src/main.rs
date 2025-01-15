@@ -32,8 +32,10 @@ async fn main() -> std::io::Result<()> {
         let t = Tokenizer::new(s);
 
         let mut p = Parser::new(t);
-        let stmt = p.parse_stmt();
-        p.print_stmt(stmt);
+        let stmt = p.parse_program();
+        for s in stmt {
+            p.print_stmt(s);
+        }
         Ok(())
     }
 }

@@ -1,8 +1,6 @@
+var x: int = "HALLO";
+x + 3;
 func main() {
-    "HALLO WELT";
-    if(test) {
-        "HALLO";
-    } else {
-        3 + 4;
-    }
+    x;
 }
+

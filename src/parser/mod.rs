@@ -1,7 +1,7 @@
 use crate::ast::*;
 use crate::tokenizer::*;
 use crate::token::*;
-
+    
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum Prio {
@@ -17,7 +17,7 @@ enum Prio {
     Prefix, 
     Call,
 }
-
+    
 
 pub struct Parser {
     t: Tokenizer,
@@ -78,7 +78,7 @@ impl Parser {
         }
         return body;
     }
-    
+
     fn parse_literal(&mut self) -> ExpRef {
         match self.cur.token_type {
             TokenType::String => {
@@ -114,8 +114,47 @@ impl Parser {
         }
         return list;
     }
+    pub fn parse_program(&mut self) -> Vec<Statement> {
+        let mut v = Vec::new();
+        while self.next.token_type != TokenType::EOF {
+            v.push(self.parse_stmt());
+        }
+        return v;
+    }
     pub fn parse_stmt(&mut self) -> Statement {
         let stmt = match self.cur.token_type {
+            TokenType::Var => {
+                self.shift();
+                let name = self.cur.value.clone();
+                if self.next.token_type != TokenType::Colon {
+                    panic!("Missing Type");
+                }
+                self.shift();
+                if self.next.token_type != TokenType::Identifier {
+                    panic!("Missing Type");
+                }
+                self.shift();
+                let var_type = self.cur.value.clone();
+                if self.next.token_type == TokenType::Semicolon {
+                    self.shift();
+                    self.shift();
+                    return Statement::VarStatement { 
+                        name,
+                        value: None,
+                        var_type
+                    }
+                }
+                self.shift();
+                self.shift();
+                let value = self.parse(Prio::None);
+                self.shift();
+                self.shift();
+                return Statement::VarStatement { 
+                    name,
+                    value: Some(value),
+                    var_type
+                }
+            }
             TokenType::If => {
                 self.shift();
                 let cond = self.parse(Prio::None);
@@ -134,7 +173,7 @@ impl Parser {
                     if_body: if_block, 
                     else_body: Some(else_block)
                 }
-                
+
             }
             TokenType::Func => {
                 self.shift();
@@ -215,7 +254,7 @@ impl Parser {
 
                 l
             }
-            
+
             _ => {
                 panic!("NOT VALID TOKENTYPE: {}", self.cur);
             }
@@ -286,7 +325,7 @@ impl Parser {
                     .map(|x| self.exp_to_string(*x))
                     .collect::<Vec<String>>()
                     .join(", ");
-                
+
                 let mut val = indent.clone();
                 val += &format!("func {}({}) {{\n", name, s);
                 for i in body {
@@ -297,11 +336,21 @@ impl Parser {
                 val += "}\n";
                 return val;
             }
+            Statement::VarStatement { name, value, var_type } => {
+                let mut val = indent.clone();
+                val += &format!("var {}: {}", name, var_type);
+                if value.is_none() {
+                    return val + "\n";
+                }
+                let v = value.unwrap();
+                val += &format!(" = {}\n", self.exp_to_string(v));
+                return val;
+            }
             Statement::ExpressionStatement(exp) => {
                 if ident > 0 {
                     return format!("\t{}\n", self.exp_to_string(exp));
                 } 
-                return format!("\t{}\n", self.exp_to_string(exp));
+                return format!("{}\n", self.exp_to_string(exp));
             }
         }
     }
