@@ -281,7 +281,6 @@ impl Parser {
                 println!("{}", self.exp_to_string(exp))
             }
         }
-        println!()
     }
 
     fn new_expression(&mut self, exp: Box<Expression>) -> ExpRef {
