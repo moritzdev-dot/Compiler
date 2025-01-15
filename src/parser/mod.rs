@@ -248,22 +248,34 @@ impl Parser {
         }
     }
     pub fn print_stmt(&self, stmt: Statement) {
+        print!("{}", self.stmt_to_string(stmt, 0));
+    }
+    pub fn stmt_to_string(&self, stmt: Statement, ident: i64) -> String{
+        let mut indent = String::new();
+        for _ in 0..ident {
+            indent += "\t";
+        }
         match stmt {
             Statement::IfElseStatement { condition, if_body, else_body } => {
-                println!("if({}) {{ ", self.exp_to_string(condition));
+                let mut val = indent.clone();
+                val += &format!("if({}) {{\n", self.exp_to_string(condition));
                 for i in if_body {
-                    self.print_stmt(*i);
+                    val += &indent;
+                    val += &self.stmt_to_string(*i, ident + 1);
                 }
-                println!("}}");
+                val += &indent;
+                val += "}";
                 if else_body.is_none() {
-                    return;
+                    return val + "\n";
                 }
-                println!("else {{");
+                val += " else {\n";
                 for i in else_body.unwrap() {
-                    self.print_stmt(*i);
+                    val += &indent;
+                    val += &self.stmt_to_string(*i, ident + 1);
                 }
-                println!("}}");
-
+                val += &indent;
+                val += "}\n";
+                return val;
             }
             Statement::FuncStatement { name, call_inputs, body } => {
                 let s = call_inputs
@@ -271,17 +283,27 @@ impl Parser {
                     .map(|x| self.exp_to_string(*x))
                     .collect::<Vec<String>>()
                     .join(", ");
-                println!("func {}({}) {{", name, s);
+                
+                let mut val = indent.clone();
+                val += &format!("func {}({}) {{\n", name, s);
                 for i in body {
-                    self.print_stmt(*i);
+                    val += &indent;
+                    val += &self.stmt_to_string(*i, ident + 1);
                 }
-                println!("}}");
+                val += &indent;
+                val += "}\n";
+                return val;
             }
             Statement::ExpressionStatement(exp) => {
-                println!("{}", self.exp_to_string(exp))
+                if ident > 0 {
+                    return format!("\t{}\n", self.exp_to_string(exp));
+                } 
+                return format!("\t{}\n", self.exp_to_string(exp));
             }
         }
     }
+
+
 
     fn new_expression(&mut self, exp: Box<Expression>) -> ExpRef {
         self.program.push(exp);
