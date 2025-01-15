@@ -6,7 +6,6 @@ use crate::token::*;
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 enum Prio {
     None,
-
     Assign,
     Or,
     And,

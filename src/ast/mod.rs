@@ -7,7 +7,7 @@ pub type ExpRef = usize;
 
 pub type Program = Vec<Box<Expression>>;
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 pub enum Statement {
     IfElseStatement {
         condition: ExpRef,

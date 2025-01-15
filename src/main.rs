@@ -3,9 +3,12 @@ mod tokenizer;
 mod ast;
 mod parser;
 mod server;
+mod optimizer;
+mod compiler;
 
 
 use std::env;
+use crate::compiler::*;
 
 use actix_web::web;
 use actix_web::*;
@@ -33,9 +36,10 @@ async fn main() -> std::io::Result<()> {
 
         let mut p = Parser::new(t);
         let stmt = p.parse_program();
-        for s in stmt {
-            p.print_stmt(s);
-        }
+        let mut c = Compiler::new(stmt, p.get_program());
+        c.compile();
+        println!("{}", c);
+
         Ok(())
     }
 }
