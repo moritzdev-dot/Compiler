@@ -1,3 +1,5 @@
+use serde::Serialize;
+
 use crate::token::*;
 
 
@@ -5,6 +7,7 @@ pub type ExpRef = usize;
 
 pub type Program = Vec<Box<Expression>>;
 
+#[derive(Serialize)]
 pub enum Statement {
     IfElseStatement {
         condition: ExpRef,
@@ -21,7 +24,7 @@ pub enum Statement {
 }
 
 
-#[derive(Clone)]
+#[derive(Clone, Serialize)]
 pub enum Expression {
 
     InfixExpression { left: ExpRef, op: TokenType, right: ExpRef },

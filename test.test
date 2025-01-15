@@ -1,7 +1,8 @@
-if(3 + 4) { 
-    3 + 3;
-    45 + 4;
-    if(3 + 1) {
-        2 + 2; 
-    } 
+func main() {
+    "HALLO WELT";
+    if(test) {
+        "HALLO";
+    } else {
+        3 + 4;
+    }
 }

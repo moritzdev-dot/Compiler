@@ -65,6 +65,9 @@ impl Parser {
 
         }
     }
+    pub fn get_program(&self) -> Program {
+        return self.program.clone();
+    }
     fn parse_block(&mut self) -> Vec<Box<Statement>> {
         self.shift();
         self.shift();

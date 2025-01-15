@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Code Editor with Graph Visualization</title>
+  <style>
+    .node circle {
+      fill: #69b3a2;
+      stroke: #000;
+      stroke-width: 1.5px;
+    }
+    .link {
+      fill: none;
+      stroke: #999;
+      stroke-opacity: 0.6;
+    }
+    text {
+      font: 10px sans-serif;
+      pointer-events: none;
+    }
+    #container {
+      display: flex;
+    }
+    #editor {
+      width: 50%;
+      height: 100vh;
+      border-right: 1px solid #ccc;
+    }
+    #visualization {
+      width: 50%;
+      height: 100vh;
+    }
+  </style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/codemirror.min.css">
+</head>
+<body>
+  <div id="container">
+    <div style="display: flex; flex-direction: column; width: 50%;">
+        <textarea id="editor">// Write your code here
+function example() {
+    return "Hello World";
+}</textarea>
+        <button id="processButton" style="margin: 10px; padding: 8px;">Process Code</button>
+    </div>
+    <div id="visualization"></div>
+  </div>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/codemirror.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.10/mode/javascript/javascript.min.js"></script>
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script src="index.js"></script>
+</body>
+</html>
