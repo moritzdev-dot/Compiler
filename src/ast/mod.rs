@@ -8,6 +8,12 @@ pub type ExpRef = usize;
 pub type Program = Vec<Box<Expression>>;
 
 #[derive(Serialize, Clone)]
+pub struct Parameter {
+    pub name: String, 
+    pub param_type: String,
+}
+
+#[derive(Serialize, Clone)]
 pub enum Statement {
     IfElseStatement {
         condition: ExpRef,
@@ -16,7 +22,7 @@ pub enum Statement {
     },
     FuncStatement {
         name: String,
-        call_inputs: Vec<ExpRef>,
+        call_inputs: Vec<Parameter>,
         body: Vec<Box<Statement>>,
     },
     VarStatement {

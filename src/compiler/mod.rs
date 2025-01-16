@@ -1,3 +1,5 @@
+use std::fmt;
+
 use symbols::*;
 
 use crate::{ast::{ExpRef, Expression, Program, Statement}, token::TokenType};
@@ -12,7 +14,21 @@ enum OpCodeTypes {
     Mul,
     Mov, 
     Push,
-    Pop
+    Pop,
+    Func(String),
+    Ret,
+}
+impl fmt::Display for OpCodeTypes {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            OpCodeTypes::Func(s) => {
+                write!(f, "{}:", s)
+            }
+            _ => { 
+                write!(f, "\t{:?}", self) 
+            }
+        }
+    }
 }
 
 pub struct Instruction {
@@ -79,8 +95,8 @@ impl Compiler {
     fn compile_infix(&mut self, left: ExpRef, right: ExpRef, op: TokenType) {
         self.compile_expression(left);
         self.compile_expression(right);
-        self.pop(Registers::RAX);
         self.pop(Registers::RBX);
+        self.pop(Registers::RAX);
         match op {
             TokenType::Plus => {
                 self.register_op(OpCodeTypes::Add, Registers::RAX, Registers::RBX);
@@ -109,25 +125,95 @@ impl Compiler {
             Expression::Integer(i) => {
                 self.create_instruction(OpCodeTypes::Push, vec![format!("{}", i)]);
             }
+            Expression::Identifier { value, ident_type } => {
+                let s = self.table.get(value);
+                if s.is_none() {
+                    return;
+                };
+                self.get_from_stack(s.unwrap().offset, Registers::RAX);
+                self.create_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+            }
             _ => {}
         }
     }
-    fn store_on_stack(&mut self, offset: u32, constant: String) {
+    fn store_reg_on_stack(&mut self, offset: u64, reg: Registers) {
         self.create_instruction(OpCodeTypes::Mov, vec![
             format!("QWORD [rbp-{}]", offset),
-            constant
+            reg.to_string()
         ]);
     }
-    fn store_ref_on_stack(&mut self, offset: u32, constant: Registers) {
+    fn get_from_stack(&mut self, offset: u64, reg: Registers) {
         self.create_instruction(OpCodeTypes::Mov, vec![
+            reg.to_string(),
             format!("QWORD [rbp-{}]", offset),
-            constant.to_string()
         ]);
+    }
+
+
+    fn push_reg(&mut self, reg: Registers) {
+        self.create_instruction(OpCodeTypes::Push, vec![reg.to_string()]);
+    }
+
+
+    fn setup_stackfram(&mut self) {
+        self.push_reg(Registers::RBP);
+        self.create_instruction(OpCodeTypes::Mov, vec![
+            Registers::RBP.to_string(),
+            Registers::RSP.to_string(),
+        ]);
+    }
+
+    fn cleanup_stackframe(&mut self) {
+        self.create_instruction(OpCodeTypes::Mov, vec![
+            Registers::RSP.to_string(),
+            Registers::RBP.to_string(),
+        ]);
+        self.pop(Registers::RBP);
     }
 
     pub fn compile_stmt(&mut self, stmt: Statement) {
         match stmt {
+            Statement::FuncStatement { name, call_inputs, body } => {
+                if name == "main" {
+                }
+                self.create_instruction(OpCodeTypes::Func(name.clone()), vec![]);
+                self.setup_stackfram();
+                self.allocate_memory(128);
+                let idx = self.output.len();
+                self.table = SymbolTable::new_from_outer(self.table.clone());
+                let mut offset = 0;
+                for inp in call_inputs {
+                    offset += 8;
+                    self.table.add(inp.name, Symbol{
+                        symb_type: inp.param_type,
+                        offset
+                    });
+                }
+                for i in body {
+                    self.compile_stmt(*i);
+                }
+                self.output[idx-1] = Instruction{
+                    opcode: OpCodeTypes::Sub,
+                    operands: vec![
+                        Registers::RBP.to_string(),
+                        format!("{}", self.table.cur_offset)
+                    ]
+                };
+                self.table = self.table.move_out();
+                self.cleanup_stackframe();
+                self.create_instruction(OpCodeTypes::Ret, vec![]);
+            }
             Statement::VarStatement { name, value, var_type } => {
+                let offset = self.table.cur_offset + 8;
+                self.table.add(name, Symbol{
+                    symb_type: var_type,
+                    offset 
+                });
+                if value.is_some() {
+                    self.compile_expression(value.unwrap());
+                    self.pop(Registers::RAX);
+                    self.store_reg_on_stack(offset, Registers::RAX);
+                }
             }
             Statement::ExpressionStatement(exp) => {
                 self.compile_expression(exp)
@@ -148,7 +234,7 @@ impl Compiler {
 impl std::fmt::Display for Instruction{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.operands.join(", ");
-        write!(f, "{} {}", format!("{:?}", self.opcode).to_uppercase(), s)
+        write!(f, "{} {}", format!("{}", self.opcode).to_uppercase(), s)
     }
 }
 

@@ -2,13 +2,12 @@ use std::collections::HashMap;
 
 
 
-#[derive(Clone)]
 pub struct Symbol {
     pub symb_type: String,
     pub offset: u64
 }
 
-#[derive(Clone)]
+
 pub struct SymbolTable {
     outer: Option<Box<SymbolTable>>,
     storage: HashMap<String, Box<Symbol>>,
@@ -25,13 +24,6 @@ impl SymbolTable {
 
         }
     }
-    pub fn move_out(&mut self) -> Self {
-        if self.outer.is_none() {
-            panic!("Somehow you did move into NONE");
-        }
-        let table = self.outer.clone().unwrap();
-        return *table;
-    }
     pub fn add(&mut self, name: String, s: Symbol) {
         if self.cur_offset < s.offset {
             self.cur_offset = s.offset;
@@ -44,7 +36,7 @@ impl SymbolTable {
 
     pub fn new_from_outer(parent: SymbolTable) -> Self {
         return SymbolTable{
-            outer: Some(Box::from(parent)),
+            outer: Some(Box::new(parent)),
             storage: HashMap::new(),
             cur_offset: 0,
         }

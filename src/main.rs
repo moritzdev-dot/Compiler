@@ -36,6 +36,9 @@ async fn main() -> std::io::Result<()> {
 
         let mut p = Parser::new(t);
         let stmt = p.parse_program();
+        for i in stmt.clone() {
+            p.print_stmt(i);
+        }
         let mut c = Compiler::new(stmt, p.get_program());
         c.compile();
         println!("{}", c);

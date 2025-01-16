@@ -97,7 +97,41 @@ impl Parser {
             }
         }
     }
-    pub fn parse_list(&mut self) -> Vec<ExpRef> {
+    fn parse_param_list(&mut self) -> Vec<Parameter> {
+        if self.cur.token_type != TokenType::LParent {
+            panic!("No Left Parenteses Found");
+        }
+        self.shift();
+        let mut list: Vec<Parameter> = Vec::new();
+        while self.cur.token_type != TokenType::RParent {
+            if self.cur.token_type != TokenType::Identifier {
+                panic!("NOT AN IDENTIFIER IN PARAMETER LIST");
+            }
+            let name = self.cur.value.clone();
+            self.shift();
+            if self.cur.token_type != TokenType::Colon {
+                panic!("NO TYPE ANOTATION");
+            }
+            self.shift();
+            if self.cur.token_type != TokenType::Identifier {
+                panic!("TYPE MISSING IN PARAMETER LIST");
+            }
+            let param_type = self.cur.value.clone();
+
+            list.push(Parameter{
+                name,
+                param_type
+            });
+
+            self.shift();
+            if self.cur.token_type == TokenType::Comma {
+                self.shift();
+            }
+        }
+        return list;
+    }
+
+    fn parse_list(&mut self) -> Vec<ExpRef> {
         if self.cur.token_type != TokenType::LParent {
             panic!("No Left Parenteses Found");
         }
@@ -187,8 +221,9 @@ impl Parser {
                 self.shift();
                 let name = self.cur.value.clone();
                 self.shift();
-                let list = self.parse_list();
+                let list = self.parse_param_list();
                 let body = self.parse_block();
+                self.shift();
                 Statement::FuncStatement { 
                     name: name.clone(),
                     call_inputs: list,
@@ -280,7 +315,7 @@ impl Parser {
             }
 
             _ => {
-                panic!("NOT VALID TOKENTYPE: {}", self.cur);
+                panic!("NOT VALID TOKENTYPE: {}",self);
             }
         };
         while !(self.next.token_type == TokenType::Semicolon) && p < Self::get_prio(&self.next.token_type){
@@ -346,7 +381,7 @@ impl Parser {
             Statement::FuncStatement { name, call_inputs, body } => {
                 let s = call_inputs
                     .iter()
-                    .map(|x| self.exp_to_string(*x))
+                    .map(|x| format!("{}: {}", x.name, x.param_type))
                     .collect::<Vec<String>>()
                     .join(", ");
 

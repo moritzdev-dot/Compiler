@@ -1,1 +1,7 @@
-3 + 3 * 3;
+func test(x: int) {
+  x + 3;
+}
+
+func test2() {
+  var y: int = 10;
+}
