@@ -18,6 +18,9 @@ enum OpCodeTypes {
     Xor,
     Call,
     Func(String),
+    Global, 
+    Extern,
+    Leave,
     Ret,
 }
 impl fmt::Display for OpCodeTypes {
@@ -26,8 +29,14 @@ impl fmt::Display for OpCodeTypes {
             OpCodeTypes::Func(s) => {
                 write!(f, "{}:", s)
             }
+            OpCodeTypes::Extern => {
+                write!(f, "extern")
+            }
+            OpCodeTypes::Global=> {
+                write!(f, "global")
+            }
             _ => { 
-                write!(f, "\t{:?}", self) 
+                write!(f, "{}", format!("\t{:?}", self).to_uppercase())
             }
         }
     }
@@ -39,6 +48,7 @@ pub struct Instruction {
 }
 #[derive(Debug)]
 pub enum Registers {
+    EAX,
     RAX,
     RDI,
     RSI,
@@ -59,7 +69,7 @@ pub struct Compiler {
     output: Vec<Instruction>,
     table: SymbolTable,
     data_section: Vec<Instruction>,
-    functions: HashMap<String, Vec<Parameter>>
+    functions: HashMap<String, Vec<Parameter>>,
 }
 
 impl Compiler {
@@ -74,6 +84,7 @@ impl Compiler {
 
         };
     }
+
 
     fn new_instruction(&mut self, opcode: OpCodeTypes, operands: Vec<String>) {
         let instruction = Instruction{
@@ -188,14 +199,15 @@ impl Compiler {
         self.pop(Registers::RBP);
     }
 
-    fn print(&mut self) {
+    fn print_builtin(&mut self) {
+        self.setup_stackfram();
         self.new_instruction(OpCodeTypes::Mov, vec![
             Registers::RDI.to_string(),
             String::from("fmt")
         ]);
         self.new_instruction(OpCodeTypes::Mov, vec![
             Registers::RSI.to_string(),
-            String::from("42")
+            format!("[RBP + 16]")
         ]);
         self.new_instruction(OpCodeTypes::Xor, vec![
             Registers::RAX.to_string(),
@@ -204,20 +216,21 @@ impl Compiler {
         self.new_instruction(OpCodeTypes::Call, vec![
             String::from("printf")
         ]);
+        //self.pop(Registers::RBP);
+        self.new_instruction(OpCodeTypes::Leave, vec![]);
+        self.new_instruction(OpCodeTypes::Ret, vec![]);
     }
 
     pub fn compile_stmt(&mut self, stmt: Statement) {
         match stmt {
             Statement::FuncStatement { name, call_inputs, body } => {
-                if name == "main" {
-                }
                 self.functions.insert(name.clone(), call_inputs.clone());
                 self.new_instruction(OpCodeTypes::Func(name.clone()), vec![]);
                 self.setup_stackfram();
-                self.alloc(0);
+                self.alloc(16);
                 let idx = self.output.len();
                 self.table = SymbolTable::new_from_outer(self.table.clone());
-                let mut offset = 0;
+                let mut offset = 8;
                 for inp in call_inputs {
                     offset += 8;
                     self.table.add(inp.name, Symbol{
@@ -240,13 +253,23 @@ impl Compiler {
                     opcode: OpCodeTypes::Sub,
                     operands: vec![
                         Registers::RSP.to_string(),
-                        format!("{}", self.table.cur_offset)
+                        format!("{}", std::cmp::max(self.table.cur_offset, 16))
                     ]
                 };
 
                 self.table = self.table.move_out();
-                self.cleanup_stackframe();
-                self.new_instruction(OpCodeTypes::Ret, vec![]);
+                if name != "main" {
+                    self.cleanup_stackframe();
+                    self.new_instruction(OpCodeTypes::Ret, vec![]);
+                } else {
+                    self.register_op(
+                        OpCodeTypes::Xor,
+                        Registers::EAX,
+                        Registers::EAX
+                    );
+                    self.new_instruction(OpCodeTypes::Leave, vec![]);
+                    self.new_instruction(OpCodeTypes::Ret, vec![]);
+                }
             }
             Statement::VarStatement { name, value, var_type } => {
                 let offset = self.table.cur_offset + 8;
@@ -266,8 +289,28 @@ impl Compiler {
             _ => {}
         }
     }
+    pub fn add_builtin_function(&mut self, name: String) {
+        self.functions.insert(
+            name.clone(),
+            vec![
+                Parameter{
+                    name: "x".to_string(),
+                    param_type: "int".to_string()
+                }
+            ]
+        );
+        self.new_instruction(OpCodeTypes::Func(name), vec![]);
+        self.print_builtin();
+    }
 
     pub fn compile(&mut self) {
+        self.new_instruction(OpCodeTypes::Global, vec![
+            String::from("main"),
+        ]);
+        self.new_instruction(OpCodeTypes::Extern, vec![
+            String::from("printf"),
+        ]);
+        self.add_builtin_function(String::from("print"));
         for stmt in self.stmts.clone() {
             self.compile_stmt(stmt);
         }
@@ -285,8 +328,9 @@ impl std::fmt::Display for Instruction{
 
 impl std::fmt::Display for Compiler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.data_section.len() > 0 {
+        if self.data_section.len() >= 0 {
             write!(f, "section .data\n")?;
+            write!(f, "\tfmt db \"%d \", 0")?;
             write!(f, "{}", self.data_section.iter()
                 .map(|inst| format!("{}", inst))
                 .collect::<Vec<String>>()
