@@ -40,6 +40,7 @@ pub enum Statement {
 
 #[derive(Clone, Serialize)]
 pub enum Expression {
+    FunctionCall { left: ExpRef, parameters: Vec<ExpRef> },
 
     InfixExpression { left: ExpRef, op: TokenType, right: ExpRef },
     PrefixExpression { op: TokenType, right: ExpRef },

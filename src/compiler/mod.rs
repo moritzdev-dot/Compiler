@@ -1,8 +1,8 @@
-use std::fmt;
+use std::{collections::HashMap, fmt};
 
 use symbols::*;
 
-use crate::{ast::{ExpRef, Expression, Program, Statement}, token::TokenType};
+use crate::{ast::{ExpRef, Expression, Parameter, Program, Statement}, token::TokenType};
 mod symbols;
 
 
@@ -15,6 +15,8 @@ enum OpCodeTypes {
     Mov, 
     Push,
     Pop,
+    Xor,
+    Call,
     Func(String),
     Ret,
 }
@@ -38,6 +40,8 @@ pub struct Instruction {
 #[derive(Debug)]
 pub enum Registers {
     RAX,
+    RDI,
+    RSI,
     RBX,
     RSP,
     RBP, 
@@ -53,7 +57,9 @@ pub struct Compiler {
     stmts: Vec<Statement>,
     program: Program,
     output: Vec<Instruction>,
-    table: SymbolTable
+    table: SymbolTable,
+    data_section: Vec<Instruction>,
+    functions: HashMap<String, Vec<Parameter>>
 }
 
 impl Compiler {
@@ -62,7 +68,10 @@ impl Compiler {
             stmts,
             program,
             output: Vec::new(),
-            table: SymbolTable::new()
+            data_section: Vec::new(),
+            table: SymbolTable::new(),
+            functions: HashMap::new(),
+
         };
     }
 
@@ -74,7 +83,7 @@ impl Compiler {
         self.output.push(instruction);
     }
     fn alloc(&mut self, bytes: u32) {
-        self.new_instruction(OpCodeTypes::Sub, vec![Registers::RBP.to_string(), format!("{}", bytes)]);
+        self.new_instruction(OpCodeTypes::Sub, vec![Registers::RSP.to_string(), format!("{}", bytes)]);
     }
 
     fn push_reg(&mut self, reg: Registers) {
@@ -133,22 +142,41 @@ impl Compiler {
                 self.get_from_stack(s.unwrap().offset, Registers::RAX);
                 self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
+            Expression::FunctionCall { left, parameters } => {
+                let (func_params, name) = match *self.program[left].clone() {
+                    Expression::Identifier { value, ident_type } => {
+                        let par = self.functions.get(&value);
+                        (par.unwrap(), value)
+                    }
+                    _ => {
+                        panic!();
+                    }
+                };
+                if func_params.len() != parameters.len() {
+                    panic!("NOT THE SAME EMOUNT OF PARAMETERS");
+                }
+                for par in parameters.iter().rev() {
+                    self.compile_expression(*par);
+                }
+                self.new_instruction(OpCodeTypes::Call, vec![name]);
+            }
             _ => {}
         }
     }
+
     fn store_reg_on_stack(&mut self, offset: u64, reg: Registers) {
         self.new_instruction(OpCodeTypes::Mov, vec![
             format!("QWORD [rbp-{}]", offset),
             reg.to_string()
         ]);
     }
+
     fn get_from_stack(&mut self, offset: u64, reg: Registers) {
         self.new_instruction(OpCodeTypes::Mov, vec![
             reg.to_string(),
             format!("QWORD [rbp-{}]", offset),
         ]);
     }
-
 
     fn setup_stackfram(&mut self) {
         self.push_reg(Registers::RBP);
@@ -160,11 +188,30 @@ impl Compiler {
         self.pop(Registers::RBP);
     }
 
+    fn print(&mut self) {
+        self.new_instruction(OpCodeTypes::Mov, vec![
+            Registers::RDI.to_string(),
+            String::from("fmt")
+        ]);
+        self.new_instruction(OpCodeTypes::Mov, vec![
+            Registers::RSI.to_string(),
+            String::from("42")
+        ]);
+        self.new_instruction(OpCodeTypes::Xor, vec![
+            Registers::RAX.to_string(),
+            Registers::RAX.to_string(),
+        ]);
+        self.new_instruction(OpCodeTypes::Call, vec![
+            String::from("printf")
+        ]);
+    }
+
     pub fn compile_stmt(&mut self, stmt: Statement) {
         match stmt {
             Statement::FuncStatement { name, call_inputs, body } => {
                 if name == "main" {
                 }
+                self.functions.insert(name.clone(), call_inputs.clone());
                 self.new_instruction(OpCodeTypes::Func(name.clone()), vec![]);
                 self.setup_stackfram();
                 self.alloc(0);
@@ -177,6 +224,14 @@ impl Compiler {
                         symb_type: inp.param_type,
                         offset
                     });
+                    self.new_instruction(OpCodeTypes::Mov, vec![
+                        Registers::RAX.to_string(),
+                        format!("QWORD [RBP + {}]", offset)
+                    ]);
+                    self.new_instruction(OpCodeTypes::Mov, vec![
+                        format!("QWORD [RBP - {}]", offset),
+                        Registers::RAX.to_string(),
+                    ]);
                 }
                 for i in body {
                     self.compile_stmt(*i);
@@ -184,7 +239,7 @@ impl Compiler {
                 self.output[idx-1] = Instruction{
                     opcode: OpCodeTypes::Sub,
                     operands: vec![
-                        Registers::RBP.to_string(),
+                        Registers::RSP.to_string(),
                         format!("{}", self.table.cur_offset)
                     ]
                 };
@@ -224,12 +279,22 @@ impl Compiler {
 impl std::fmt::Display for Instruction{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = self.operands.join(", ");
-        write!(f, "{} {}", format!("{}", self.opcode).to_uppercase(), s)
+        write!(f, "{} {}", format!("{}", self.opcode), s)
     }
 }
 
 impl std::fmt::Display for Compiler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.data_section.len() > 0 {
+            write!(f, "section .data\n")?;
+            write!(f, "{}", self.data_section.iter()
+                .map(|inst| format!("{}", inst))
+                .collect::<Vec<String>>()
+                .join("\n")
+            )?;
+            write!(f, "\n")?;
+        }
+        write!(f, "section .text\n")?;
         write!(f, "{}", self.output.iter()
             .map(|inst| format!("{}", inst))
             .collect::<Vec<String>>()
@@ -237,3 +302,4 @@ impl std::fmt::Display for Compiler {
         )
     }
 }
+

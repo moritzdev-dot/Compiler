@@ -99,7 +99,7 @@ impl Parser {
     }
     fn parse_param_list(&mut self) -> Vec<Parameter> {
         if self.cur.token_type != TokenType::LParent {
-            panic!("No Left Parenteses Found");
+            panic!("No Left Parenteses Found {}", self);
         }
         self.shift();
         let mut list: Vec<Parameter> = Vec::new();
@@ -276,6 +276,15 @@ impl Parser {
     }
 
     fn parse_infix(&mut self, left: ExpRef) -> ExpRef {
+        if self.cur.token_type == TokenType::LParent {
+            let parameters = self.parse_list();
+            return self.new_expression(
+                Box::new(Expression::FunctionCall {
+                    left,
+                    parameters 
+                })
+            )
+        }
         let op = self.cur.token_type.clone();
         let p = Self::get_prio(&self.cur.token_type);
         self.shift();
@@ -333,6 +342,17 @@ impl Parser {
                 let l_string = self.exp_to_string(left);
                 let r_string = self.exp_to_string(right);
                 return format!("({} {:?} {})", l_string, op, r_string);
+            }
+            Expression::FunctionCall { left, parameters } => {
+                return format!("{}({})",
+                    self.exp_to_string(left),
+                    parameters
+                        .iter()
+                        .map(|x| self.exp_to_string(*x))
+                        .collect::<Vec<String>>()
+                        .join(", ")
+                )
+
             }
             Expression::Integer(i) => {
                 return format!("{}", i);
