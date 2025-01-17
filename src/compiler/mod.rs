@@ -22,6 +22,15 @@ enum OpCodeTypes {
     Extern,
     Leave,
     Ret,
+    Cmp,
+    Movzx,
+    Setl,
+    Setg,
+    Setle,
+    Setge,
+    Sete,
+    Je,
+    Jmp
 }
 impl fmt::Display for OpCodeTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -48,6 +57,7 @@ pub struct Instruction {
 }
 #[derive(Debug)]
 pub enum Registers {
+    AL,
     EAX,
     RAX,
     RDI,
@@ -70,6 +80,7 @@ pub struct Compiler {
     table: SymbolTable,
     data_section: Vec<Instruction>,
     functions: HashMap<String, Vec<Parameter>>,
+    cur_cond_idx: i64,
 }
 
 impl Compiler {
@@ -81,6 +92,7 @@ impl Compiler {
             data_section: Vec::new(),
             table: SymbolTable::new(),
             functions: HashMap::new(),
+            cur_cond_idx: 0,
 
         };
     }
@@ -100,6 +112,7 @@ impl Compiler {
     fn push_reg(&mut self, reg: Registers) {
         self.new_instruction(OpCodeTypes::Push, vec![reg.to_string()]);
     }
+
     fn push_const(&mut self, constant: String) {
         self.new_instruction(OpCodeTypes::Push, vec![constant]);
     }
@@ -130,10 +143,49 @@ impl Compiler {
                 self.register_op(OpCodeTypes::Mul, Registers::RAX, Registers::RBX);
                 self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
+            TokenType::LT | TokenType::GT | TokenType::LTEQ | TokenType::GTEQ | TokenType::EQ => {
+                self.comp(op);
+            }
             _ => {
                 panic!();
             }
         }
+    }
+
+    // COMPARE RAX op RBX
+    fn comp(&mut self, op: TokenType) {
+        self.register_op(OpCodeTypes::Cmp, Registers::RAX, Registers::RBX);
+        match op {
+            TokenType::LT => {
+                self.new_instruction(OpCodeTypes::Setl, vec![
+                    Registers::AL.to_string()
+                ]);
+            }
+            TokenType::GT => {
+                self.new_instruction(OpCodeTypes::Setg, vec![
+                    Registers::AL.to_string()
+                ]);
+            }
+            TokenType::LTEQ => {
+                self.new_instruction(OpCodeTypes::Setle, vec![
+                    Registers::AL.to_string()
+                ]);
+            }
+            TokenType::GTEQ => {
+                self.new_instruction(OpCodeTypes::Setge, vec![
+                    Registers::AL.to_string()
+                ]);
+            }
+            TokenType::EQ=> {
+                self.new_instruction(OpCodeTypes::Sete, vec![
+                    Registers::AL.to_string()
+                ]);
+            }
+            _ => {}
+
+        }
+        self.register_op(OpCodeTypes::Movzx, Registers::RAX, Registers::AL);
+        self.push_reg(Registers::RAX);
     }
 
     pub fn compile_expression(&mut self, exp: ExpRef) {
@@ -223,6 +275,34 @@ impl Compiler {
 
     pub fn compile_stmt(&mut self, stmt: Statement) {
         match stmt {
+            Statement::IfElseStatement { condition, if_body, else_body } => {
+                self.compile_expression(condition);
+                self.pop(Registers::RAX);
+                self.new_instruction(OpCodeTypes::Cmp, vec![
+                    Registers::RAX.to_string(),
+                    format!("{}", 0),
+                ]);
+                let i = self.cur_cond_idx;
+                self.new_instruction(OpCodeTypes::Je, vec![
+                    format!(".A{}", i)
+                ]);
+                self.cur_cond_idx += 1;
+                for i in if_body {
+                    self.compile_stmt(*i);
+                }
+                let j = self.cur_cond_idx;
+                self.new_instruction(OpCodeTypes::Jmp, vec![
+                    format!(".A{}", j)
+                ]);
+                self.new_instruction(OpCodeTypes::Func(format!(".A{}", i)), vec![]);
+                if else_body.is_some() {
+                    for i in else_body.unwrap() {
+                        self.compile_stmt(*i);
+                    }
+                }
+                self.new_instruction(OpCodeTypes::Func(format!(".A{}", j)), vec![]);
+
+            }
             Statement::FuncStatement { name, call_inputs, body } => {
                 self.functions.insert(name.clone(), call_inputs.clone());
                 self.new_instruction(OpCodeTypes::Func(name.clone()), vec![]);
