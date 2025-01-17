@@ -38,7 +38,6 @@ pub struct Instruction {
 #[derive(Debug)]
 pub enum Registers {
     RAX,
-    RBI,
     RBX,
     RSP,
     RBP, 
@@ -59,7 +58,7 @@ pub struct Compiler {
 
 impl Compiler {
     pub fn new(stmts: Vec<Statement>, program: Program) -> Self{
-        return Compiler {
+        return Self {
             stmts,
             program,
             output: Vec::new(),
@@ -67,29 +66,30 @@ impl Compiler {
         };
     }
 
-    fn create_instruction(&mut self, opcode: OpCodeTypes, operands: Vec<String>) {
+    fn new_instruction(&mut self, opcode: OpCodeTypes, operands: Vec<String>) {
         let instruction = Instruction{
             opcode,
             operands
         };
         self.output.push(instruction);
     }
-    fn allocate_memory(&mut self, bytes: u32) {
-        self.create_instruction(OpCodeTypes::Sub, vec![Registers::RBP.to_string(), format!("{}", bytes)]);
+    fn alloc(&mut self, bytes: u32) {
+        self.new_instruction(OpCodeTypes::Sub, vec![Registers::RBP.to_string(), format!("{}", bytes)]);
     }
-    fn mov_reg_to_rax(&mut self, reg: Registers) {
-        self.create_instruction(OpCodeTypes::Mov, vec![Registers::RAX.to_string(), reg.to_string()]);
+
+    fn push_reg(&mut self, reg: Registers) {
+        self.new_instruction(OpCodeTypes::Push, vec![reg.to_string()]);
     }
-    fn mov_to_rax(&mut self, constant: String) {
-        self.create_instruction(OpCodeTypes::Mov, vec![Registers::RAX.to_string(), constant]);
+    fn push_const(&mut self, constant: String) {
+        self.new_instruction(OpCodeTypes::Push, vec![constant]);
     }
 
     fn pop(&mut self, reg: Registers) {
-        self.create_instruction(OpCodeTypes::Pop, vec![reg.to_string()]);
+        self.new_instruction(OpCodeTypes::Pop, vec![reg.to_string()]);
     }
 
     fn register_op(&mut self, opcode: OpCodeTypes, reg1: Registers, reg2: Registers) {
-        self.create_instruction(opcode, vec![reg1.to_string(), reg2.to_string()]);
+        self.new_instruction(opcode, vec![reg1.to_string(), reg2.to_string()]);
     }
 
     fn compile_infix(&mut self, left: ExpRef, right: ExpRef, op: TokenType) {
@@ -100,15 +100,15 @@ impl Compiler {
         match op {
             TokenType::Plus => {
                 self.register_op(OpCodeTypes::Add, Registers::RAX, Registers::RBX);
-                self.create_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
             TokenType::Minus => {
                 self.register_op(OpCodeTypes::Sub, Registers::RAX, Registers::RBX);
-                self.create_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
             TokenType::Astrik => {
                 self.register_op(OpCodeTypes::Mul, Registers::RAX, Registers::RBX);
-                self.create_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
             _ => {
                 panic!();
@@ -123,7 +123,7 @@ impl Compiler {
                 self.compile_infix(left, right, op);
             }
             Expression::Integer(i) => {
-                self.create_instruction(OpCodeTypes::Push, vec![format!("{}", i)]);
+                self.new_instruction(OpCodeTypes::Push, vec![format!("{}", i)]);
             }
             Expression::Identifier { value, ident_type } => {
                 let s = self.table.get(value);
@@ -131,43 +131,32 @@ impl Compiler {
                     return;
                 };
                 self.get_from_stack(s.unwrap().offset, Registers::RAX);
-                self.create_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
             _ => {}
         }
     }
     fn store_reg_on_stack(&mut self, offset: u64, reg: Registers) {
-        self.create_instruction(OpCodeTypes::Mov, vec![
+        self.new_instruction(OpCodeTypes::Mov, vec![
             format!("QWORD [rbp-{}]", offset),
             reg.to_string()
         ]);
     }
     fn get_from_stack(&mut self, offset: u64, reg: Registers) {
-        self.create_instruction(OpCodeTypes::Mov, vec![
+        self.new_instruction(OpCodeTypes::Mov, vec![
             reg.to_string(),
             format!("QWORD [rbp-{}]", offset),
         ]);
     }
 
 
-    fn push_reg(&mut self, reg: Registers) {
-        self.create_instruction(OpCodeTypes::Push, vec![reg.to_string()]);
-    }
-
-
     fn setup_stackfram(&mut self) {
         self.push_reg(Registers::RBP);
-        self.create_instruction(OpCodeTypes::Mov, vec![
-            Registers::RBP.to_string(),
-            Registers::RSP.to_string(),
-        ]);
+        self.register_op(OpCodeTypes::Mov, Registers::RBP, Registers::RSP);
     }
 
     fn cleanup_stackframe(&mut self) {
-        self.create_instruction(OpCodeTypes::Mov, vec![
-            Registers::RSP.to_string(),
-            Registers::RBP.to_string(),
-        ]);
+        self.register_op(OpCodeTypes::Mov, Registers::RSP, Registers::RBP);
         self.pop(Registers::RBP);
     }
 
@@ -176,9 +165,9 @@ impl Compiler {
             Statement::FuncStatement { name, call_inputs, body } => {
                 if name == "main" {
                 }
-                self.create_instruction(OpCodeTypes::Func(name.clone()), vec![]);
+                self.new_instruction(OpCodeTypes::Func(name.clone()), vec![]);
                 self.setup_stackfram();
-                self.allocate_memory(128);
+                self.alloc(0);
                 let idx = self.output.len();
                 self.table = SymbolTable::new_from_outer(self.table.clone());
                 let mut offset = 0;
@@ -199,9 +188,10 @@ impl Compiler {
                         format!("{}", self.table.cur_offset)
                     ]
                 };
+
                 self.table = self.table.move_out();
                 self.cleanup_stackframe();
-                self.create_instruction(OpCodeTypes::Ret, vec![]);
+                self.new_instruction(OpCodeTypes::Ret, vec![]);
             }
             Statement::VarStatement { name, value, var_type } => {
                 let offset = self.table.cur_offset + 8;
