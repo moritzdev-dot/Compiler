@@ -282,25 +282,26 @@ impl Compiler {
                     Registers::RAX.to_string(),
                     format!("{}", 0),
                 ]);
-                let i = self.cur_cond_idx;
-                self.new_instruction(OpCodeTypes::Je, vec![
-                    format!(".A{}", i)
-                ]);
+                let idx1 = self.cur_cond_idx;
                 self.cur_cond_idx += 1;
+                self.new_instruction(OpCodeTypes::Je, vec![
+                    format!(".A{}", idx1)
+                ]);
                 for i in if_body {
                     self.compile_stmt(*i);
                 }
-                let j = self.cur_cond_idx;
+                let idx2 = self.cur_cond_idx;
+                self.cur_cond_idx += 1;
                 self.new_instruction(OpCodeTypes::Jmp, vec![
-                    format!(".A{}", j)
+                    format!(".A{}", idx2)
                 ]);
-                self.new_instruction(OpCodeTypes::Func(format!(".A{}", i)), vec![]);
+                self.new_instruction(OpCodeTypes::Func(format!(".A{}", idx1)), vec![]);
                 if else_body.is_some() {
                     for i in else_body.unwrap() {
                         self.compile_stmt(*i);
                     }
                 }
-                self.new_instruction(OpCodeTypes::Func(format!(".A{}", j)), vec![]);
+                self.new_instruction(OpCodeTypes::Func(format!(".A{}", idx2)), vec![]);
 
             }
             Statement::FuncStatement { name, call_inputs, body } => {

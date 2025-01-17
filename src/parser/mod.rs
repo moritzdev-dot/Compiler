@@ -191,7 +191,10 @@ impl Parser {
             TokenType::If => {
                 self.shift();
                 let cond = self.parse(Prio::None);
+                println!("IFFFF");
                 let if_block = self.parse_block();
+                println!("DONE IFF");
+                println!("ELSE, {}", self);
                 if self.next.token_type != TokenType::Else {
                     return Statement::IfElseStatement { 
                         condition: cond, 
@@ -200,7 +203,9 @@ impl Parser {
                     }
                 }
                 self.shift();
+                println!("{}", self);
                 let else_block = self.parse_block();
+                self.shift();
                 Statement::IfElseStatement { 
                     condition: cond, 
                     if_body: if_block, 

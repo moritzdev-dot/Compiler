@@ -36,14 +36,25 @@ main:
 	PUSH 3
 	POP RBX
 	POP RAX
-	ADD RAX, RBX
+	CMP RAX, RBX
+	SETL AL
+	MOVZX RAX, AL
 	PUSH RAX
+	POP RAX
+	CMP RAX, 0
+	JE .A1
+	PUSH 1
 	CALL print
-	JMP .A1
-.A0: 
-	PUSH 2000
-	CALL print
+	JMP .A2
 .A1: 
+	PUSH 2
+	CALL print
+.A2: 
+	JMP .A3
+.A0: 
+	PUSH 3
+	CALL print
+.A3: 
 	XOR EAX, EAX
 	LEAVE 
 	RET 
