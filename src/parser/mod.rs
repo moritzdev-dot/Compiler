@@ -227,11 +227,18 @@ impl Parser {
                 let name = self.cur.value.clone();
                 self.shift();
                 let list = self.parse_param_list();
+                let mut func_type: Option<String> = None;
+                if self.next.token_type == TokenType::Colon {
+                    self.shift();
+                    self.shift();
+                    func_type = Some(self.cur.value.clone());
+                }
                 let body = self.parse_block();
                 self.shift();
                 Statement::FuncStatement { 
                     name: name.clone(),
                     call_inputs: list,
+                    return_type: func_type,
                     body 
                 }
             }
@@ -403,7 +410,7 @@ impl Parser {
                 val += "}\n";
                 return val;
             }
-            Statement::FuncStatement { name, call_inputs, body } => {
+            Statement::FuncStatement { name, call_inputs, return_type, body } => {
                 let s = call_inputs
                     .iter()
                     .map(|x| format!("{}: {}", x.name, x.param_type))
@@ -411,7 +418,11 @@ impl Parser {
                     .join(", ");
 
                 let mut val = indent.clone();
-                val += &format!("func {}({}) {{\n", name, s);
+                if return_type.is_some() {
+                    val += &format!("func {}({}): {} {{\n", name, s, return_type.unwrap());
+                } else {
+                    val += &format!("func {}({}) {{\n", name, s);
+                }
                 for i in body {
                     val += &indent;
                     val += &self.stmt_to_string(*i, ident + 1);

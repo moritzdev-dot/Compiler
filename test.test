@@ -1,5 +1,11 @@
-func main() {
-  var x: string = "HALLO";
-  print("%s", x);
-  print("%d", 3);
+func f(x: int): int {
+  if(x > 5) {
+    return x;
+  } else {
+    return 10;
+  }
+}
+
+func main(): int {
+  print("%d", f(5));
 }

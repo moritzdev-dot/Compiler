@@ -1,9 +1,5 @@
 section .data
 .S0: 
-	DB "HALLO", 0
-.S1: 
-	DB "%s", 0
-.S2: 
 	DB "%d", 0
 
 section .text
@@ -18,21 +14,44 @@ print:
 	CALL printf
 	LEAVE 
 	RET 
+f: 
+	PUSH RBP
+	MOV RBP, RSP
+	SUB RSP, 16
+	MOV RAX, QWORD [RBP + 16]
+	MOV QWORD [RBP - 16], RAX
+	MOV RAX, QWORD [rbp-16]
+	PUSH RAX
+	PUSH 5
+	POP RBX
+	POP RAX
+	CMP RAX, RBX
+	SETG AL
+	MOVZX RAX, AL
+	PUSH RAX
+	POP RAX
+	CMP RAX, 0
+	JE .A0
+	MOV RAX, QWORD [rbp-16]
+	PUSH RAX
+	LEAVE 
+	RET 
+	JMP .A1
+.A0: 
+	PUSH 10
+	LEAVE 
+	RET 
+.A1: 
+	MOV RSP, RBP
+	POP RBP
+	RET 
 main: 
 	PUSH RBP
 	MOV RBP, RSP
 	SUB RSP, 16
+	PUSH 5
+	CALL f
 	MOV RAX, .S0
-	PUSH RAX
-	POP RAX
-	MOV QWORD [rbp-8], RAX
-	MOV RAX, QWORD [rbp-8]
-	PUSH RAX
-	MOV RAX, .S1
-	PUSH RAX
-	CALL print
-	PUSH 3
-	MOV RAX, .S2
 	PUSH RAX
 	CALL print
 	XOR EAX, EAX

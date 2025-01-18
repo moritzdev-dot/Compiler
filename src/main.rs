@@ -41,7 +41,7 @@ async fn main() -> std::io::Result<()> {
         }
         let mut c = Compiler::new(stmt, p.get_program());
         c.compile();
-        println!("{}", c);
+        //println!("{}", c);
         std::fs::write("test.asm", format!("{}\n", c))?;
         Ok(())
     }

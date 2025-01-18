@@ -80,7 +80,7 @@ pub struct Compiler {
     output: Vec<Instruction>,
     table: SymbolTable,
     data_section: Vec<Instruction>,
-    functions: HashMap<String, Vec<Parameter>>,
+    functions: HashMap<String, (Vec<Parameter>, Option<String>)>,
     local_labels: Vec<Instruction>,
     cur_cond_idx: i64,
     cur_str_idx: i64,
@@ -250,7 +250,7 @@ impl Compiler {
                 self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
             }
             Expression::FunctionCall { left, parameters } => {
-                let (func_params, name) = match *self.program[left].clone() {
+                let (p, name) = match *self.program[left].clone() {
                     Expression::Identifier { value, ident_type } => {
                         let par = self.functions.get(&value);
                         (par.unwrap(), value)
@@ -259,6 +259,8 @@ impl Compiler {
                         panic!();
                     }
                 };
+                let func_params = &p.0;
+                let return_type = &p.1;
                 if func_params.len() != parameters.len() {
                     panic!("NOT THE SAME EMOUNT OF PARAMETERS");
                 }
@@ -350,8 +352,11 @@ impl Compiler {
                 self.new_instruction(OpCodeTypes::Func(format!(".A{}", idx2)), vec![]);
 
             }
-            Statement::FuncStatement { name, call_inputs, body } => {
-                self.functions.insert(name.clone(), call_inputs.clone());
+            Statement::FuncStatement { name, call_inputs, return_type, body } => {
+                self.functions.insert(
+                    name.clone(),
+                    (call_inputs.clone(), return_type)
+                );
                 self.new_instruction(OpCodeTypes::Func(name.clone()), vec![]);
                 self.setup_stackfram();
                 self.alloc(16);
@@ -410,16 +415,20 @@ impl Compiler {
                     self.store_reg_on_stack(offset, Registers::RAX);
                 }
             }
+            Statement::ReturnStatement { value } => {
+                self.compile_expression(value);
+                self.new_instruction(OpCodeTypes::Leave, vec![]);
+                self.new_instruction(OpCodeTypes::Ret, vec![]);
+            }
             Statement::ExpressionStatement(exp) => {
                 self.compile_expression(exp)
             }
-            _ => {}
         }
     }
     pub fn add_builtin_function(&mut self, name: String) {
         self.functions.insert(
             name.clone(),
-            vec![
+            (vec![
                 Parameter{
                     name: "fmt".to_string(),
                     param_type: "string".to_string()
@@ -428,7 +437,7 @@ impl Compiler {
                     name: "x".to_string(),
                     param_type: "any".to_string()
                 }
-            ]
+            ], None)
         );
         self.new_instruction(OpCodeTypes::Func(name), vec![]);
         self.print_builtin();

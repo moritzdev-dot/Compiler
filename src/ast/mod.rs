@@ -22,6 +22,7 @@ pub enum Statement {
     },
     FuncStatement {
         name: String,
+        return_type: Option<String>,
         call_inputs: Vec<Parameter>,
         body: Vec<Box<Statement>>,
     },
