@@ -1,12 +1,5 @@
 func main() {
-  var x: int = 3;
-  if(x > 5) {
-    if(x < 3) {
-      print(1);
-    } else {
-      print(2);
-    }
-  } else {
-    print(3);
-  }
+  var x: string = "HALLO";
+  print("%s", x);
+  print("%d", 3);
 }

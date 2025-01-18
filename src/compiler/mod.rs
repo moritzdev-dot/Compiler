@@ -30,7 +30,8 @@ enum OpCodeTypes {
     Setge,
     Sete,
     Je,
-    Jmp
+    Jmp,
+    Db,
 }
 impl fmt::Display for OpCodeTypes {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -80,7 +81,9 @@ pub struct Compiler {
     table: SymbolTable,
     data_section: Vec<Instruction>,
     functions: HashMap<String, Vec<Parameter>>,
+    local_labels: Vec<Instruction>,
     cur_cond_idx: i64,
+    cur_str_idx: i64,
 }
 
 impl Compiler {
@@ -92,8 +95,9 @@ impl Compiler {
             data_section: Vec::new(),
             table: SymbolTable::new(),
             functions: HashMap::new(),
+            local_labels: Vec::new(),
             cur_cond_idx: 0,
-
+            cur_str_idx: 0,
         };
     }
 
@@ -126,6 +130,21 @@ impl Compiler {
     }
 
     fn compile_infix(&mut self, left: ExpRef, right: ExpRef, op: TokenType) {
+        if op == TokenType::Assign {
+            self.compile_expression(right);
+            self.pop(Registers::RAX);
+            let exp = &self.program[left];
+            match *exp.clone() {
+                Expression::Identifier { value, ident_type } => {
+                    let symbol = self.table.get(value.clone()).expect(&format!("Variable {} not defined", value));
+                    self.store_reg_on_stack(symbol.offset, Registers::RAX);
+                    return;
+                }
+                _ => {
+                    panic!("Tried to assign value to not identifier")
+                }
+            }
+        }
         self.compile_expression(left);
         self.compile_expression(right);
         self.pop(Registers::RBX);
@@ -133,15 +152,15 @@ impl Compiler {
         match op {
             TokenType::Plus => {
                 self.register_op(OpCodeTypes::Add, Registers::RAX, Registers::RBX);
-                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.push_reg(Registers::RAX);
             }
             TokenType::Minus => {
                 self.register_op(OpCodeTypes::Sub, Registers::RAX, Registers::RBX);
-                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.push_reg(Registers::RAX);
             }
             TokenType::Astrik => {
                 self.register_op(OpCodeTypes::Mul, Registers::RAX, Registers::RBX);
-                self.new_instruction(OpCodeTypes::Push, vec![Registers::RAX.to_string()]);
+                self.push_reg(Registers::RAX);
             }
             TokenType::LT | TokenType::GT | TokenType::LTEQ | TokenType::GTEQ | TokenType::EQ => {
                 self.comp(op);
@@ -193,6 +212,31 @@ impl Compiler {
         match expression {
             Expression::InfixExpression { left, op, right } => {
                 self.compile_infix(left, right, op);
+            }
+            Expression::String(s)  => {
+                self.data_section.push(Instruction {
+                    opcode: OpCodeTypes::Func(
+                        format!(".S{}", self.cur_str_idx),
+                    ), 
+                    operands: vec![]
+                });
+
+                self.data_section.push(
+                    Instruction {
+                        opcode: OpCodeTypes::Db,
+                        operands: vec![
+                            format!("\"{}\"", s),
+                            format!("0")
+                            
+                        ]
+                    }
+                );
+                self.new_instruction(OpCodeTypes::Mov, vec![
+                    Registers::RAX.to_string(),
+                    format!(".S{}", self.cur_str_idx)
+                ]);
+                self.cur_str_idx += 1;
+                self.push_reg(Registers::RAX);
             }
             Expression::Integer(i) => {
                 self.new_instruction(OpCodeTypes::Push, vec![format!("{}", i)]);
@@ -255,12 +299,14 @@ impl Compiler {
         self.setup_stackfram();
         self.new_instruction(OpCodeTypes::Mov, vec![
             Registers::RDI.to_string(),
-            String::from("fmt")
-        ]);
-        self.new_instruction(OpCodeTypes::Mov, vec![
-            Registers::RSI.to_string(),
             format!("[RBP + 16]")
         ]);
+
+        self.new_instruction(OpCodeTypes::Mov, vec![
+            Registers::RSI.to_string(),
+            String::from("[RBP + 24]")
+        ]);
+
         self.new_instruction(OpCodeTypes::Xor, vec![
             Registers::RAX.to_string(),
             Registers::RAX.to_string(),
@@ -375,8 +421,12 @@ impl Compiler {
             name.clone(),
             vec![
                 Parameter{
+                    name: "fmt".to_string(),
+                    param_type: "string".to_string()
+                },
+                Parameter{
                     name: "x".to_string(),
-                    param_type: "int".to_string()
+                    param_type: "any".to_string()
                 }
             ]
         );
@@ -409,9 +459,8 @@ impl std::fmt::Display for Instruction{
 
 impl std::fmt::Display for Compiler {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.data_section.len() >= 0 {
-            write!(f, "section .data\n")?;
-            write!(f, "\tfmt db \"%d \", 0")?;
+        write!(f, "section .data\n")?;
+        if self.data_section.len() > 0 {
             write!(f, "{}", self.data_section.iter()
                 .map(|inst| format!("{}", inst))
                 .collect::<Vec<String>>()
@@ -419,7 +468,12 @@ impl std::fmt::Display for Compiler {
             )?;
             write!(f, "\n")?;
         }
-        write!(f, "section .text\n")?;
+        write!(f, "{}", self.local_labels.iter()
+            .map(|inst| format!("{}", inst))
+            .collect::<Vec<String>>()
+            .join("\n")
+        )?;
+        write!(f, "\nsection .text\n")?;
         write!(f, "{}", self.output.iter()
             .map(|inst| format!("{}", inst))
             .collect::<Vec<String>>()
